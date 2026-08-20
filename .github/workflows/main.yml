@@ -2,206 +2,103 @@ name: Build and Release Luxury APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
+    env:
+      # Buildozer به طور پیش‌فرض SDK را زیر $HOME/.buildozer/android/platform/android-sdk قرار می‌دهد.
+      ANDROID_HOME: ${{ runner.home }}/.buildozer/android/platform/android-sdk
+      ANDROID_SDK_ROOT: ${{ runner.home }}/.buildozer/android/platform/android-sdk
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Set up Java JDK 17
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip curl zip openjdk-11-jdk
+
+      - name: Install Java (Temurin 11) for tooling
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '11'
 
-      - name: Install System Dependencies
+      - name: Install Android SDK command-line tools + sdkmanager
         run: |
-          set -euo pipefail
+          set -e
+          SDK_ROOT="${ANDROID_SDK_ROOT}"
+          mkdir -p "${SDK_ROOT}"
+          cd "${HOME}"
 
-          sudo apt-get update
+          # دانلود commandline tools (نسخه ممکن است در آینده تغییر کند - اگر لازم شد نسخه جدید را جایگزین کنید)
+          CLI_ZIP="commandlinetools-linux-latest.zip"
+          curl -fLo "${CLI_ZIP}" "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
 
-          # ensure add-apt-repository is available and enable 'universe' (needed for libunwind-dev)
-          sudo apt-get install -y software-properties-common
-          sudo add-apt-repository -y universe
-          sudo apt-get update
+          mkdir -p cmdline-tools-temp
+          unzip -q "${CLI_ZIP}" -d cmdline-tools-temp
 
-          # install core dependencies (install libunwind-dev explicitly to satisfy libgstreamer1.0-dev)
-          sudo apt-get install -y --no-install-recommends \
-            libunwind-dev libsqlite3-dev lzip unzip git zip curl build-essential pkg-config
-
-          # multimedia / dev libs
-          sudo apt-get install -y --no-install-recommends \
-            ffmpeg \
-            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-            libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev zlib1g-dev
-
-          # gstreamer and plugins
-          sudo apt-get install -y --no-install-recommends \
-            libgstreamer1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav gstreamer1.0-tools
-
-          # attempt to fix any broken deps
-          sudo apt-get -f install -y || true
-
-          # python packages
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.33 kivy kivymd plyer
-
-      - name: Install Android SDK command-line tools and build-tools
-        run: |
-          set -euo pipefail
-
-          # Local SDK path
-          ANDROID_HOME="$HOME/android-sdk"
-          ANDROID_SDK_ROOT="$ANDROID_HOME"
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-
-          cd "$HOME"
-
-          # download command-line tools (update version URL if needed)
-          CLI_ZIP_URL="https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
-          curl -sSLo commandlinetools.zip "$CLI_ZIP_URL"
-          unzip -q commandlinetools.zip -d cmdline-tools-tmp
-
-          # sdkmanager expects cmdline-tools/latest - handle possible extraction layouts
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-          if [ -d cmdline-tools-tmp/cmdline-tools ]; then
-            mv cmdline-tools-tmp/cmdline-tools/* "$ANDROID_HOME/cmdline-tools/latest/"
+          # قرار دادن در مسیر مورد انتظار buildozer: <SDK_ROOT>/cmdline-tools/latest
+          mkdir -p "${SDK_ROOT}/cmdline-tools/latest"
+          # بعضی zipها پوشه cmdline-tools/ دارند؛ سازگار کردن با هر دو حالت
+          if [ -d cmdline-tools-temp/cmdline-tools ]; then
+            mv cmdline-tools-temp/cmdline-tools/* "${SDK_ROOT}/cmdline-tools/latest/"
           else
-            mv cmdline-tools-tmp/* "$ANDROID_HOME/cmdline-tools/latest/" || true
-          fi
-          rm -rf commandlinetools.zip cmdline-tools-tmp
-
-          # Ensure Java location explicit for sdkmanager (setup-java previously installed Java)
-          : "${JAVA_HOME:=/usr/lib/jvm/java-17-openjdk-amd64}"
-          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-          export JAVA_HOME="$JAVA_HOME"
-
-          # Ensure legacy tools/ layout exists so Buildozer and other scripts can find sdkmanager
-          mkdir -p "$ANDROID_HOME/tools"
-          if [ ! -e "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
-            # create a tools -> cmdline-tools/latest symlink to restore legacy layout
-            ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
-            echo "Created legacy symlink: $ANDROID_HOME/tools -> $ANDROID_HOME/cmdline-tools/latest"
+            mv cmdline-tools-temp/* "${SDK_ROOT}/cmdline-tools/latest/"
           fi
 
-          # make sure tools/bin is available in PATH for legacy lookups and publish env for subsequent steps
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          # include tools/bin (legacy), cmdline-tools/latest/bin (current), and build-tools/platform-tools
-          echo "PATH=$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2:$ANDROID_HOME/cmdline-tools/latest/bin:$HOME/.local/bin:$PATH" >> $GITHUB_ENV
+          rm -rf cmdline-tools-temp "${CLI_ZIP}"
 
-          # set SDKMANAGER to the tools/bin path (legacy) if available, otherwise fallback
-          if [ -x "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
-            SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
-          else
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          fi
-          chmod +x "$SDKMANAGER"
+          export PATH="${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/platform-tools:${PATH}"
 
-          # diagnostics: show sdkmanager and directories
-          echo "=== sdkmanager location ==="
-          if command -v sdkmanager >/dev/null 2>&1; then
-            command -v sdkmanager || true
-          else
-            echo "sdkmanager not on PATH currently"
-          fi
-          ls -la "$ANDROID_HOME/tools/bin" || true
-          ls -la "$ANDROID_HOME/cmdline-tools/latest/bin" || true
+          # اطمینان از وجود sdkmanager و پذیرش لایسنس‌ها
+          yes | sdkmanager --sdk_root="${SDK_ROOT}" --licenses || true
 
-          if [ ! -x "$ANDROID_HOME/tools/bin/sdkmanager" ] && [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-            echo "ERROR: sdkmanager not found in expected locations"
-            ls -la "$ANDROID_HOME" || true
+          # نصب بسته‌های پایه (ویرژن‌ها را بر اساس نیاز پروژه‌تان تنظیم کنید)
+          sdkmanager --sdk_root="${SDK_ROOT}" "platform-tools" "platforms;android-33" "build-tools;31.0.0" || {
+            echo "sdkmanager install failed; printing diagnostics"
+            echo "=== sdkmanager --version ==="
+            sdkmanager --version || true
+            echo "=== SDK root contents ==="
+            ls -la "${SDK_ROOT}" || true
             exit 1
-          fi
+          }
 
-          # Accept licenses (ignore non-zero exit here since sdkmanager sometimes returns non-zero even when done)
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
-
-          # Packages to install (add an older build-tools for compatibility with Buildozer)
-          PACKAGES=( "platform-tools" "platforms;android-33" "build-tools;33.0.2" "build-tools;30.0.3" )
-
-          MAX_TRIES=4
-          for try in $(seq 1 $MAX_TRIES); do
-            echo "sdkmanager install attempt $try"
-            if "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "${PACKAGES[@]}"; then
-              echo "sdkmanager install succeeded"
-              break
-            fi
-            echo "sdkmanager install failed on attempt $try"
-            if [ "$try" -lt "$MAX_TRIES" ]; then
-              echo "Retrying in 10s..."
-              sleep 10
-            else
-              echo "Trying last resort with --no_https"
-              "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --no_https "${PACKAGES[@]}" || {
-                echo "ERROR: sdkmanager failed to install required packages"
-                # dump diagnostics
-                echo "=== sdkmanager --version ==="; "$SDKMANAGER" --version || true
-                echo "=== SDK root contents ==="; ls -la "$ANDROID_HOME" || true
-                exit 1
-              }
-            fi
-          done
-
-          # Verify build-tools and aidl exist
-          echo "=== build-tools listing ==="
-          ls -la "$ANDROID_HOME/build-tools" || true
-          for v in 33.0.2 30.0.3; do
-            echo "Checking aidl for $v..."
-            if [ -x "$ANDROID_HOME/build-tools/$v/aidl" ]; then
-              echo "Found aidl at $ANDROID_HOME/build-tools/$v/aidl"
-            else
-              echo "aidl NOT found for $v"
-            fi
-          done
-
-          # Create symlink so Buildozer sees the SDK in ~/.buildozer/android/platform/android-sdk
-          mkdir -p "$HOME/.buildozer/android/platform"
-          if [ ! -e "$HOME/.buildozer/android/platform/android-sdk" ]; then
-            ln -s "$ANDROID_HOME" "$HOME/.buildozer/android/platform/android-sdk"
-            echo "Created symlink $HOME/.buildozer/android/platform/android-sdk -> $ANDROID_HOME"
-          fi
-
-      - name: Build APK with Buildozer
+      - name: Ensure PATH contains sdkmanager for subsequent steps
         run: |
-          set -euo pipefail
-          export PATH="$HOME/.local/bin:$PATH"
+          echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
 
-          # accept licenses automatically via buildozer env
-          export APP_ANDROID_ACCEPT_SDK_LICENSE="1"
-          
-          # verbose build so logs help debugging
-          buildozer -v android debug
-
-      - name: List APKs
+      - name: Install/Upgrade pip & Buildozer deps
         run: |
-          echo "Looking for APKs in $(pwd)/bin"
-          ls -la bin || true
+          python -m pip install --upgrade pip
+          pip install --upgrade buildozer cython
 
-      - name: Get Date
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d-%H%M')" >> $GITHUB_OUTPUT
+      - name: (Optional) Show SDK layout for debug
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          ls -la "${ANDROID_HOME}"
+          ls -la "${ANDROID_HOME}/cmdline-tools"
+          ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin" || true
 
-      - name: Create Release and Upload APK
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.date.outputs.date }}
-          name: "Luxury Torch Build ${{ steps.date.outputs.date }}"
-          files: bin/*.apk
-          body: "فایل APK چراغ‌قوه لوکس پایتون با موفقیت ساخته شد."
+      - name: Build with Buildozer (debug)
+        working-directory: .
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        run: |
+          set -e
+          export ANDROID_HOME="${ANDROID_HOME}"
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}"
+          export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/platform-tools:${PATH}"
+          # اگر buildozer.spec در ریشه نیست مسیر مناسب را قرار دهید
+          buildozer -v android debug
