@@ -1,4 +1,4 @@
 kivy
 kivymd
 plyer
-Aidi
+Aidl
