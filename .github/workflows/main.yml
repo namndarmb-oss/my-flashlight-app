@@ -1,104 +1,99 @@
-name: Build and Release Luxury APK
+name: Build Luxury Torch APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      # Buildozer به طور پیش‌فرض SDK را زیر $HOME/.buildozer/android/platform/android-sdk قرار می‌دهد.
-      ANDROID_HOME: ${{ runner.home }}/.buildozer/android/platform/android-sdk
-      ANDROID_SDK_ROOT: ${{ runner.home }}/.buildozer/android/platform/android-sdk
-
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install system packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl zip openjdk-11-jdk
-
-      - name: Install Java (Temurin 11) for tooling
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '11'
-
-      - name: Install Android SDK command-line tools + sdkmanager
-        run: |
-          set -e
-          SDK_ROOT="${ANDROID_SDK_ROOT}"
-          mkdir -p "${SDK_ROOT}"
-          cd "${HOME}"
-
-          # دانلود commandline tools (نسخه ممکن است در آینده تغییر کند - اگر لازم شد نسخه جدید را جایگزین کنید)
-          CLI_ZIP="commandlinetools-linux-latest.zip"
-          curl -fLo "${CLI_ZIP}" "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
-
-          mkdir -p cmdline-tools-temp
-          unzip -q "${CLI_ZIP}" -d cmdline-tools-temp
-
-          # قرار دادن در مسیر مورد انتظار buildozer: <SDK_ROOT>/cmdline-tools/latest
-          mkdir -p "${SDK_ROOT}/cmdline-tools/latest"
-          # بعضی zipها پوشه cmdline-tools/ دارند؛ سازگار کردن با هر دو حالت
-          if [ -d cmdline-tools-temp/cmdline-tools ]; then
-            mv cmdline-tools-temp/cmdline-tools/* "${SDK_ROOT}/cmdline-tools/latest/"
-          else
-            mv cmdline-tools-temp/* "${SDK_ROOT}/cmdline-tools/latest/"
-          fi
-
-          rm -rf cmdline-tools-temp "${CLI_ZIP}"
-
-          export PATH="${SDK_ROOT}/cmdline-tools/latest/bin:${SDK_ROOT}/platform-tools:${PATH}"
-
-          # اطمینان از وجود sdkmanager و پذیرش لایسنس‌ها
-          yes | sdkmanager --sdk_root="${SDK_ROOT}" --licenses || true
-
-          # نصب بسته‌های پایه (ویرژن‌ها را بر اساس نیاز پروژه‌تان تنظیم کنید)
-          sdkmanager --sdk_root="${SDK_ROOT}" "platform-tools" "platforms;android-33" "build-tools;31.0.0" || {
-            echo "sdkmanager install failed; printing diagnostics"
-            echo "=== sdkmanager --version ==="
-            sdkmanager --version || true
-            echo "=== SDK root contents ==="
-            ls -la "${SDK_ROOT}" || true
-            exit 1
-          }
-
-      - name: Ensure PATH contains sdkmanager for subsequent steps
-        run: |
-          echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
-
-      - name: Install/Upgrade pip & Buildozer deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade buildozer cython
-
-      - name: (Optional) Show SDK layout for debug
-        run: |
-          echo "ANDROID_HOME=${ANDROID_HOME}"
-          ls -la "${ANDROID_HOME}"
-          ls -la "${ANDROID_HOME}/cmdline-tools"
-          ls -la "${ANDROID_HOME}/cmdline-tools/latest/bin" || true
-
-      - name: Build with Buildozer (debug)
-        working-directory: .
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-        run: |
-          set -e
-          export ANDROID_HOME="${ANDROID_HOME}"
-          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}"
-          export PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools/bin:${ANDROID_HOME}/platform-tools:${PATH}"
-          # اگر buildozer.spec در ریشه نیست مسیر مناسب را قرار دهید
-          buildozer -v android debug
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Cache Buildozer
+      uses: actions/cache@v4
+      with:
+        path: .buildozer
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          ${{ runner.os }}-buildozer-
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip \
+          build-essential \
+          git \
+          python3-dev \
+          ffmpeg \
+          libsdl2-dev \
+          libsdl2-image-dev \
+          libsdl2-mixer-dev \
+          libsdl2-ttf-dev \
+          libportmidi-dev \
+          libswscale-dev \
+          libavformat-dev \
+          libavcodec-dev \
+          zlib1g-dev \
+          libgstreamer1.0-0 \
+          gstreamer1.0-plugins-base \
+          gstreamer1.0-plugins-good \
+          libjpeg-dev \
+          libpng-dev \
+          libtiff-dev \
+          libfreetype6-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config
+    
+    - name: Install Buildozer
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython
+    
+    - name: Install project dependencies
+      run: |
+        pip install kivy kivymd plyer
+    
+    - name: Build APK
+      run: |
+        buildozer android debug
+    
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: luxury-torch-apk
+        path: bin/*.apk
+        retention-days: 30
+    
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: bin/*.apk
+        tag_name: v${{ github.run_number }}
+        name: Luxury Torch v${{ github.run_number }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
