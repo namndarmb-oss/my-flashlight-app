@@ -3,6 +3,8 @@ name: Build Luxury Torch APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -10,26 +12,28 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v3
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: '3.10'
     
     - name: Cache pip packages
-      uses: actions/cache@v4
+      uses: actions/cache@v3
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
     
     - name: Cache Buildozer
-      uses: actions/cache@v4
+      uses: actions/cache@v3
       with:
-        path: .buildozer
+        path: |
+          .buildozer
+          ~/.buildozer
         key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
         restore-keys: |
           ${{ runner.os }}-buildozer-
@@ -39,9 +43,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           python3-pip \
+          python3-dev \
           build-essential \
           git \
-          python3-dev \
           ffmpeg \
           libsdl2-dev \
           libsdl2-image-dev \
@@ -64,33 +68,50 @@ jobs:
           autoconf \
           automake \
           libtool \
-          pkg-config
+          pkg-config \
+          zip \
+          unzip \
+          openjdk-17-jdk
     
-    - name: Install Buildozer
+    - name: Upgrade pip and install Python packages
       run: |
-        pip install --upgrade pip
-        pip install buildozer cython
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
     
-    - name: Install project dependencies
+    - name: Verify installed packages
       run: |
-        pip install kivy kivymd plyer
+        pip list
+        python -c "import kivy; print('Kivy version:', kivy.__version__)"
+        python -c "import kivymd; print('KivyMD version:', kivymd.__version__)"
+        python -c "import plyer; print('Plyer imported successfully')"
     
-    - name: Build APK
+    - name: Build APK with Buildozer
       run: |
         buildozer android debug
     
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
+    - name: List generated files
+      run: |
+        echo "Listing bin directory:"
+        ls -la bin/ || echo "bin directory not found"
+        echo "Listing current directory:"
+        ls -la
+    
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
       with:
         name: luxury-torch-apk
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          *.apk
         retention-days: 30
     
-    - name: Create Release
+    - name: Create GitHub Release
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v1
       with:
-        files: bin/*.apk
+        files: |
+          bin/*.apk
+          *.apk
         tag_name: v${{ github.run_number }}
         name: Luxury Torch v${{ github.run_number }}
         draft: false
