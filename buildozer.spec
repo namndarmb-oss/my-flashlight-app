@@ -8,7 +8,7 @@ version = 0.1
 requirements = python3,kivy==2.3.0,kivymd,plyer
 
 # مجوزهای الزامی
-android.permissions = CAMERA, FLASHLIGHT
+android.permissions = CAMERA, WAKE_LOCK
 android.api = 33
 android.minapi = 21
 android.archs = arm64-v8a, armeabi-v7a
