@@ -85,18 +85,48 @@ jobs:
           fi
           rm -rf commandlinetools.zip cmdline-tools-tmp
 
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          chmod +x "$SDKMANAGER"
-
           # Ensure Java location explicit for sdkmanager (setup-java previously installed Java)
           : "${JAVA_HOME:=/usr/lib/jvm/java-17-openjdk-amd64}"
           echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
           export JAVA_HOME="$JAVA_HOME"
 
-          # publish env for subsequent steps
+          # Ensure legacy tools/ layout exists so Buildozer and other scripts can find sdkmanager
+          mkdir -p "$ANDROID_HOME/tools"
+          if [ ! -e "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
+            # create a tools -> cmdline-tools/latest symlink to restore legacy layout
+            ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
+            echo "Created legacy symlink: $ANDROID_HOME/tools -> $ANDROID_HOME/cmdline-tools/latest"
+          fi
+
+          # make sure tools/bin is available in PATH for legacy lookups and publish env for subsequent steps
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2:$ANDROID_HOME/cmdline-tools/latest/bin:$HOME/.local/bin:$PATH" >> $GITHUB_ENV
+          # include tools/bin (legacy), cmdline-tools/latest/bin (current), and build-tools/platform-tools
+          echo "PATH=$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.2:$ANDROID_HOME/cmdline-tools/latest/bin:$HOME/.local/bin:$PATH" >> $GITHUB_ENV
+
+          # set SDKMANAGER to the tools/bin path (legacy) if available, otherwise fallback
+          if [ -x "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
+            SDKMANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          else
+            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          chmod +x "$SDKMANAGER"
+
+          # diagnostics: show sdkmanager and directories
+          echo "=== sdkmanager location ==="
+          if command -v sdkmanager >/dev/null 2>&1; then
+            command -v sdkmanager || true
+          else
+            echo "sdkmanager not on PATH currently"
+          fi
+          ls -la "$ANDROID_HOME/tools/bin" || true
+          ls -la "$ANDROID_HOME/cmdline-tools/latest/bin" || true
+
+          if [ ! -x "$ANDROID_HOME/tools/bin/sdkmanager" ] && [ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            echo "ERROR: sdkmanager not found in expected locations"
+            ls -la "$ANDROID_HOME" || true
+            exit 1
+          fi
 
           # Accept licenses (ignore non-zero exit here since sdkmanager sometimes returns non-zero even when done)
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
