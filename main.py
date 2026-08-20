@@ -3,8 +3,13 @@ from kivymd.uix.screen import MDScreen
 from kivymd.uix.button import MDIconButton
 from kivymd.uix.label import MDLabel
 from kivy.utils import get_color_from_hex
-from plyer import flash
 from kivy.clock import Clock
+
+# safe import for flash (so running on desktop or during some build steps won't crash)
+try:
+    from plyer import flash
+except Exception:
+    flash = None
 
 class LuxuryTorch(MDScreen):
     def __init__(self, **kwargs):
@@ -37,12 +42,18 @@ class LuxuryTorch(MDScreen):
     def toggle_flash(self, instance):
         try:
             if not self.is_on:
-                flash.on()
+                if flash:
+                    flash.on()
+                else:
+                    print("Flash API not available on this platform")
                 self.is_on = True
                 self.btn.icon_color = get_color_from_hex("#D4AF37") # روشن شدن به رنگ طلایی
                 self.btn.md_bg_color = get_color_from_hex("#25252B")
             else:
-                flash.off()
+                if flash:
+                    flash.off()
+                else:
+                    print("Flash API not available on this platform")
                 self.is_on = False
                 self.btn.icon_color = get_color_from_hex("#444444")
                 self.md_bg_color = get_color_from_hex("#0F0F12")
