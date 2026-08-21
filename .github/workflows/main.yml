@@ -14,7 +14,7 @@ jobs:
       ANDROID_API: 33
       ANDROID_BUILD_TOOLS: 33.0.2
       ANDROID_MIN_API: 21
-      ANDROID_NDK_VERSION: r25b
+      ANDROID_NDK_VERSION: 25.2.9519653
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -39,7 +39,6 @@ jobs:
         run: |
           mkdir -p $HOME/android-sdk/cmdline-tools
           cd $HOME/android-sdk
-          # Update URL if Google publishes a newer commandlinetools package
           SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
           curl -fSL "$SDK_URL" -o cmdline-tools.zip
           unzip -q cmdline-tools.zip -d cmdline-tools-temp
@@ -60,8 +59,24 @@ jobs:
           ANDROID_BUILD_TOOLS: ${{ env.ANDROID_BUILD_TOOLS }}
           ANDROID_NDK_VERSION: ${{ env.ANDROID_NDK_VERSION }}
         run: |
+          set -e
           yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" "ndk;${ANDROID_NDK_VERSION}" "cmdline-tools;latest"
+
+          echo "Listing available remote packages (filtered for ndk):"
+          sdkmanager --list | sed -n '1,200p' | grep -E 'ndk;|ndk-bundle' || true
+
+          REQUESTED="ndk;${ANDROID_NDK_VERSION}"
+          FALLBACK="ndk;25.2.9519653"
+
+          if sdkmanager --list | grep -q "${REQUESTED}"; then
+            echo "Installing ${REQUESTED}"
+            sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" "${REQUESTED}" "cmdline-tools;latest"
+            echo "ANDROID_NDK_VERSION=${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+          else
+            echo "Requested ${REQUESTED} not found. Falling back to ${FALLBACK}"
+            sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" "${FALLBACK}" "cmdline-tools;latest"
+            echo "ANDROID_NDK_VERSION=${FALLBACK#ndk;}" >> $GITHUB_ENV
+          fi
 
       - name: Ensure user local bin in PATH and install Python tooling
         run: |
@@ -92,4 +107,14 @@ jobs:
           ANDROIDSDK: $HOME/android-sdk
           ANDROID_HOME: $HOME/android-sdk
         run: |
-          # Optional: clean first to avoid stale state](#)
+          set -e
+          # Optional clean to avoid stale state:
+          ~/.local/bin/buildozer -v android debug
+
+      - name: Upload APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            **/*.apk
