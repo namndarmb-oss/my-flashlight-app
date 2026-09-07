@@ -1,120 +1,57 @@
-name: Android Build (Buildozer)
+:.github/workflows/build_apk.yml
+name: Build and Deploy APK
 
+# اجرا شدن وقتی کد به شاخهٔ main پوش می‌شود
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_API: 33
-      ANDROID_BUILD_TOOLS: 33.0.2
-      ANDROID_MIN_API: 21
-      ANDROID_NDK_VERSION: 25.2.9519653
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      # 1️⃣ دریافت کد منبع
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-      - name: Install system packages (autotools, dev libs, build tools)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential git curl unzip wget ca-certificates pkg-config \
-            autoconf automake libtool libtool-bin autopoint gettext \
-            libffi-dev libgdbm-dev libsqlite3-dev tk-dev libssl-dev zlib1g-dev \
-            libbz2-dev libreadline-dev libncurses5-dev libncurses-dev liblzma-dev \
-            libdb5.3-dev python3-venv python3-dev openjdk-11-jdk-headless
-
-      - name: Set up Java (Temurin 11)
-        uses: actions/setup-java@v4
+      # 2️⃣ نصب Python (نسخه 3.9)
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          distribution: temurin
-          java-version: '11'
+          python-version: '3.9'
 
-      - name: Install Android SDK commandline tools
+      # 3️⃣ نصب وابستگی‌های Buildozer، Kivy و Plyer
+      - name: Install build dependencies
         run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          cd $HOME/android-sdk
-          SDK_URL="https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
-          curl -fSL "$SDK_URL" -o cmdline-tools.zip
-          unzip -q cmdline-tools.zip -d cmdline-tools-temp
-          mkdir -p cmdline-tools/latest
-          mv cmdline-tools-temp/cmdline-tools/* cmdline-tools/latest/
-          rm -rf cmdline-tools-temp cmdline-tools.zip
+          python -m pip install --upgrade pip
+          pip install buildozer
+          pip install kivy plyer
 
-      - name: Export Android environment variables
+      # 4️⃣ ساخت APK (حالت debug)
+      - name: Build APK
         run: |
-          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+          # Buildozer به‌صورت پیش‌فرض در پوشهٔ ریشهٔ پروژه اجرا می‌شود
+          buildozer android debug
 
-      - name: Accept licenses and install Android packages (platforms, build-tools, ndk)
-        env:
-          ANDROID_API: ${{ env.ANDROID_API }}
-          ANDROID_BUILD_TOOLS: ${{ env.ANDROID_BUILD_TOOLS }}
-          ANDROID_NDK_VERSION: ${{ env.ANDROID_NDK_VERSION }}
-        run: |
-          set -e
-          yes | sdkmanager --licenses || true
-
-          echo "Listing available remote packages (filtered for ndk):"
-          sdkmanager --list | sed -n '1,200p' | grep -E 'ndk;|ndk-bundle' || true
-
-          REQUESTED="ndk;${ANDROID_NDK_VERSION}"
-          FALLBACK="ndk;25.2.9519653"
-
-          if sdkmanager --list | grep -q "${REQUESTED}"; then
-            echo "Installing ${REQUESTED}"
-            sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" "${REQUESTED}" "cmdline-tools;latest"
-            echo "ANDROID_NDK_VERSION=${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
-          else
-            echo "Requested ${REQUESTED} not found. Falling back to ${FALLBACK}"
-            sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" "${FALLBACK}" "cmdline-tools;latest"
-            echo "ANDROID_NDK_VERSION=${FALLBACK#ndk;}" >> $GITHUB_ENV
-          fi
-
-      - name: Ensure user local bin in PATH and install Python tooling
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install --user --upgrade buildozer cython virtualenv
-          python3 -m pip install --user --upgrade python-for-android
-          echo "${HOME}/.local/bin" >> $GITHUB_PATH
-
-      - name: Cache buildozer and pip packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.buildozer
-            ~/.local
-            .buildozer
-          key: ${{ runner.os }}-buildozer-${{ hashFiles('**/buildozer.spec') }}
-
-      - name: Show environment (debug)
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          echo "PATH=$PATH"
-          sdkmanager --list || true
-
-      - name: Build APK with Buildozer
-        env:
-          ANDROIDNDK: $HOME/android-sdk/ndk/${{ env.ANDROID_NDK_VERSION }}
-          ANDROIDSDK: $HOME/android-sdk
-          ANDROID_HOME: $HOME/android-sdk
-        run: |
-          set -e
-          # Optional clean to avoid stale state:
-          ~/.local/bin/buildozer -v android debug
-
+      # 5️⃣ بارگذاری APK به‌عنوان artifact
       - name: Upload APK artifact
-        if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v2
         with:
-          name: apk
-          path: |
-            **/*.apk
+          name: torchlight-debug.apk
+          path: torchlight/bin/torchlight-1.0-debug.apk
+
+      # 6️⃣ ایجاد/به‌روزرسانی Release و افزودن APK به آن
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "v1.0-${{ github.sha }}"
+          name: "Torch Light – Debug Build"
+          body: |
+            APK ساخته شده به‌صورت خودکار توسط GitHub Actions.
+            SHA: ${{ github.sha }}
+          artifacts: torchlight/bin/torchlight-1.0-debug.apk
+          draft: false
+          prerelease: true
