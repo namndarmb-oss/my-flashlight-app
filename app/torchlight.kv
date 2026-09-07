@@ -1,0 +1,16 @@
+:torchlight/app/torchlight.kv
+<TorchLayout>:
+    orientation: 'vertical'
+    padding: dp(20)
+    spacing: dp(20)
+
+    # متن دکمه بسته به وضعیت چراغ قوه
+    Button:
+        id: toggle_btn
+        text: 'روشن کردن چراغ قوه' if not root.is_on else 'خاموش کردن چراغ قوه'
+        font_size: '20sp'
+        size_hint_y: None
+        height: dp(80)
+        background_normal: ''
+        background_color: (0.2, 0.6, 0.9, 1) if not root.is_on else (0.9, 0.2, 0.2, 1)
+        on_release: root.toggle_flashlight()
