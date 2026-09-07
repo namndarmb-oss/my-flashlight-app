@@ -1,7 +1,5 @@
 :.github/workflows/build_apk.yml
 name: Build and Deploy APK
-
-# اجرا شدن وقتی کد به شاخهٔ main پوش می‌شود
 on:
   push:
     branches:
@@ -14,11 +12,11 @@ jobs:
     steps:
       # 1️⃣ دریافت کد منبع
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # 2️⃣ نصب Python (نسخه 3.9)
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
@@ -32,12 +30,11 @@ jobs:
       # 4️⃣ ساخت APK (حالت debug)
       - name: Build APK
         run: |
-          # Buildozer به‌صورت پیش‌فرض در پوشهٔ ریشهٔ پروژه اجرا می‌شود
           buildozer android debug
 
       # 5️⃣ بارگذاری APK به‌عنوان artifact
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: torchlight-debug.apk
           path: torchlight/bin/torchlight-1.0-debug.apk
