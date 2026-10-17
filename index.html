@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FONT CONVERTER // مبدل فونت حرفه‌ای</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: 'Segoe UI', 'Vazirmatn', Tahoma, sans-serif;
+    background: #0a0a0a;
+    background-image: 
+      linear-gradient(rgba(255,149,0,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,149,0,0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+    color: #c8c8c8;
+    min-height: 100vh;
+    padding: 30px 20px;
+    direction: rtl;
+  }
+  
+  .wrap { max-width: 1050px; margin: 0 auto; }
+  
+  header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 22px;
+    border-bottom: 2px solid #1f1f1f;
+    position: relative;
+  }
+  
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    right: 50%;
+    transform: translateX(50%);
+    width: 80px;
+    height: 2px;
+    background: #ff9500;
+    box-shadow: 0 0 15px rgba(255,149,0,0.6);
+  }
+  
+  h1 {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 10px;
+    color: #e5e5e5;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+  }
+  
+  .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background: #ff9500;
+    animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,149,0,0.5); }
+    50% { opacity: 0.5; box-shadow: 0 0 0 8px rgba(255,149,0,0); }
+  }
+  
+  .sub {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    color: #555;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  
+  .mode-selector {
+    display: flex;
+    gap: 0;
+    margin-bottom: 18px;
+    border: 1px solid #252525;
+    background: #0d0d0d;
+  }
+  
+  .mode-btn {
+    flex: 1;
+    padding: 16px 20px;
+    background: transparent;
+    color: #555;
+    border: none;
+    border-left: 1px solid #252525;
+    cursor: pointer;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  
+  .mode-btn:last-child { border-left: none; }
+  .mode-btn:hover { background: #141414; color: #888; }
+  
+  .mode-btn.active {
+    background: #ff9500;
+    color: #0a0a0a;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3);
+  }
+  
+  textarea {
+    width: 100%;
+    min-height: 130px;
+    padding: 20px;
+    font-size: 22px;
+    font-family: 'Vazirmatn', 'Segoe UI', Tahoma, sans-serif;
+    background: #0d0d0d;
+    border: 1px solid #252525;
+    border-right: 3px solid #ff9500;
+    color: #fff;
+    resize: vertical;
+    outline: none;
+    transition: all 0.2s;
+    margin-bottom: 25px;
+    line-height: 1.6;
+  }
+  
+  textarea:focus {
+    border-color: #ff9500;
+    background: #111;
+    box-shadow: 0 0 25px rgba(255,149,0,0.08);
+  }
+  
+  textarea::placeholder { color: #444; }
+  
+  .output {
+    display: flex;
+    align-items: center;
+    background: #0d0d0d;
+    border: 1px solid #1c1c1c;
+    border-right: 3px solid #333;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    gap: 15px;
+    transition: all 0.18s;
+  }
+  
+  .output:hover {
+    border-right-color: #ff9500;
+    background: #111;
+    transform: translateX(-4px);
+  }
+  
+  .output.copied-flash {
+    background: rgba(255,149,0,0.08);
+    border-right-color: #ff9500;
+  }
+  
+  .label {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    color: #777;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    min-width: 160px;
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+  
+  .text {
+    flex: 1;
+    font-size: 24px;
+    color: #fff;
+    word-break: break-word;
+    min-height: 32px;
+    padding: 0 10px;
+    line-height: 1.4;
+  }
+  
+  .text.ltr { direction: ltr; text-align: left; }
+  .text.rtl { direction: rtl; text-align: right; font-family: 'Vazirmatn', 'Segoe UI', Tahoma, sans-serif; }
+  
+  .copy {
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+    padding: 9px 20px;
+    cursor: pointer;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    min-width: 95px;
+  }
+  
+  .copy:hover {
+    border-color: #ff9500;
+    color: #ff9500;
+    background: rgba(255,149,0,0.05);
+  }
+  
+  .copy.copied {
+    background: #ff9500;
+    border-color: #ff9500;
+    color: #0a0a0a;
+  }
+  
+  .note {
+    text-align: center;
+    font-size: 12px;
+    color: #555;
+    margin-top: 25px;
+    padding: 18px;
+    border-top: 1px solid #1c1c1c;
+    line-height: 1.9;
+  }
+  
+  .note .accent { color: #ff9500; }
+  
+  @media (max-width: 700px) {
+    h1 { font-size: 16px; letter-spacing: 5px; gap: 8px; }
+    .dot { width: 7px; height: 7px; }
+    .output { flex-wrap: wrap; gap: 10px; }
+    .label { min-width: 100%; font-size: 10px; }
+    .text { font-size: 20px; padding: 0; }
+    .copy { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dot"></span>FONT CONVERTER<span class="dot"></span></h1>
+    <p class="sub">ENGINEERED TEXT · v2.0</p>
+  </header>
+  
+  <div class="mode-selector">
+    <button class="mode-btn active" data-mode="en">ENGLISH</button>
+    <button class="mode-btn" data-mode="fa">فارسی</button>
+  </div>
+  
+  <textarea id="input" placeholder="متن را وارد کنید..." autofocus></textarea>
+  
+  <div id="outputs"></div>
+  
+  <div class="note">
+    <span class="accent">●</span> سازنده : محمد قسیم محمدی<br>
+    <span class="accent">●</span> هر استایل با کلیک روی «COPY» در هر اپلیکیشنی (اینستاگرام، تلگرام، واتساپ، توییتر...) قابل استفاده است.
+  </div>
+</div>
+<script>
+const inputEl = document.getElementById('input');
+const outputsEl = document.getElementById('outputs');
+const modeBtns = document.querySelectorAll('.mode-btn');
+
+let currentMode = 'en';
+let userSelectedMode = false;
+
+/* ============ ابزار پایه ============ */
+function applyMap(text, map) {
+  let out = '';
+  for (const ch of text) out += (map[ch] !== undefined ? map[ch] : ch);
+  return out;
+}
+
+const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', az = 'abcdefghijklmnopqrstuvwxyz';
+
+function rangeMap(upperStart, lowerStart, digitStart, exc) {
+  exc = exc || {};
+  const m = {};
+  for (let i = 0; i < 26; i++) {
+    m[AZ[i]] = exc[AZ[i]] || String.fromCodePoint(upperStart + i);
+    m[az[i]] = exc[az[i]] || String.fromCodePoint(lowerStart + i);
+  }
+  if (digitStart != null) for (let i = 0; i < 10; i++) m[String(i)] = String.fromCodePoint(digitStart + i);
+  return m;
+}
+
+function circleMap() {
+  const m = {};
+  for (let i = 0; i < 26; i++) {
+    m[AZ[i]] = String.fromCodePoint(0x24B6 + i);
+    m[az[i]] = String.fromCodePoint(0x24D0 + i);
+  }
+  m['0'] = '\u24EA';
+  for (let i = 1; i <= 9; i++) m[String(i)] = String.fromCodePoint(0x2460 + i - 1);
+  return m;
+}
+
+function negCircleMap() {
+  const m = {};
+  for (let i = 0; i < 26; i++) { const c = String.fromCodePoint(0x1F150 + i); m[AZ[i]] = c; m[az[i]] = c; }
+  return m;
+}
+
+function squaredMap() {
+  const m = {};
+  for (let i = 0; i < 26; i++) { const c = String.fromCodePoint(0x1F130 + i); m[AZ[i]] = c; m[az[i]] = c; }
+  return m;
+}
+
+function negSquaredMap() {
+  const m = {};
+  for (let i = 0; i < 26; i++) { const c = String.fromCodePoint(0x1F170 + i); m[AZ[i]] = c; m[az[i]] = c; }
+  return m;
+}
+
+function parenMap() {
+  const m = {};
+  for (let i = 0; i < 26; i++) m[az[i]] = String.fromCodePoint(0x249C + i);
+  for (let i = 1; i <= 9; i++) m[String(i)] = String.fromCodePoint(0x2474 + i - 1);
+  return m;
+}
+
+const smallCapsBase = {
+  'a':'ᴀ','b':'ʙ','c':'ᴄ','d':'ᴅ','e':'ᴇ','f':'ꜰ','g':'ɢ','h':'ʜ','i':'ɪ','j':'ᴊ',
+  'k':'ᴋ','l':'ʟ','m':'ᴍ','n':'ɴ','o':'ᴏ','p':'ᴘ','q':'ǫ','r':'ʀ','s':'s','t':'ᴛ',
+  'u':'ᴜ','v':'ᴠ','w':'ᴡ','x':'x','y':'ʏ','z':'ᴢ'
+};
+function smallCapsMap() {
+  const m = {};
+  for (const k in smallCapsBase) { m[k] = smallCapsBase[k]; m[k.toUpperCase()] = smallCapsBase[k]; }
+  return m;
+}
+
+const supMap = {
+  'a':'ᵃ','b':'ᵇ','c':'ᶜ','d':'ᵈ','e':'ᵉ','f':'ᶠ','g':'ᵍ','h':'ʰ','i':'ⁱ','j':'ʲ',
+  'k':'ᵏ','l':'ˡ','m':'ᵐ','n':'ⁿ','o':'ᵒ','p':'ᵖ','q':'q','r':'ʳ','s':'ˢ','t':'ᵗ',
+  'u':'ᵘ','v':'ᵛ','w':'ʷ','x':'ˣ','y':'ʸ','z':'ᶻ',
+  'A':'ᴬ','B':'ᴮ','C':'ᶜ','D':'ᴰ','E':'ᴱ','F':'ᶠ','G':'ᴳ','H':'ᴴ','I':'ᴵ','J':'ᴶ',
+  'K':'ᴷ','L':'ᴸ','M':'ᴹ','N':'ᴺ','O':'ᴼ','P':'ᴾ','Q':'Q','R':'ᴿ','S':'ˢ','T':'ᵀ',
+  'U':'ᵁ','V':'ⱽ','W':'ᵂ','X':'ˣ','Y':'ʸ','Z':'ᶻ',
+  '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'
+};
+
+const subMap = {
+  'a':'ₐ','b':'♭','c':'꜀','d':'ᑯ','e':'ₑ','f':'ꜰ','g':'₉','h':'ₕ','i':'ᵢ','j':'ⱼ',
+  'k':'ₖ','l':'ₗ','m':'ₘ','n':'ₙ','o':'ₒ','p':'ₚ','q':'q','r':'ᵣ','s':'ₛ','t':'ₜ',
+  'u':'ᵤ','v':'ᵥ','w':'w','x':'ₓ','y':'y','z':'z',
+  '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'
+};
+
+const flipMap = {
+  'a':'ɐ','b':'q','c':'ɔ','d':'p','e':'ǝ','f':'ɟ','g':'ƃ','h':'ɥ','i':'ᴉ','j':'ɾ',
+  'k':'ʞ','l':'l','m':'ɯ','n':'u','o':'o','p':'d','q':'b','r':'ɹ','s':'s','t':'ʇ',
+  'u':'n','v':'ʌ','w':'ʍ','x':'x','y':'ʎ','z':'z',
+  'A':'∀','B':'ᗺ','C':'Ɔ','D':'ᗡ','E':'Ǝ','F':'Ⅎ','G':'⅁','H':'H','I':'I','J':'ſ',
+  'K':'ʞ','L':'˥','M':'W','N':'N','O':'O','P':'Ԁ','Q':'Ό','R':'ᴚ','S':'S','T':'⊥',
+  'U':'∩','V':'Λ','W':'M','X':'X','Y':'⅄','Z':'Z',
+  '.':'˙',',':'`','?':'¿','!':'¡',"'":',','"':'„',';':'؛',
+  '(':')',')':'(','[':']',']':'[','{':'}','}':'{','<':'>','>':'<','_':'‾',
+  '0':'0','1':'Ɩ','2':'ᄅ','3':'Ɛ','4':'ㄣ','5':'ϛ','6':'9','7':'ㄥ','8':'8','9':'6'
+};
+
+function upsideDown(text) {
+  let out = '';
+  for (const ch of text) out = (flipMap[ch] !== undefined ? flipMap[ch] : ch) + out;
+  return out;
+}
+function strikeMark(text) { let o = ''; for (const c of text) o += c + '\u0336'; return o; }
+function underlineMark(text) { let o = ''; for (const c of text) o += c + '\u0332'; return o; }
+
+/* ============ استایل‌های انگلیسی ============ */
+function E(name, map) { return { name, apply: t => applyMap(t, map) }; }
+
+const englishStyles = [
+  { name: '✦ Normal', apply: t => t },
+  E('✦ Bold',            rangeMap(0x1D400, 0x1D41A, 0x1D7CE)),
+  E('✦ Italic',          rangeMap(0x1D434, 0x1D44E, null, {'h':'\u210E'})),
+  E('✦ Bold Italic',     rangeMap(0x1D468, 0x1D482)),
+  E('✦ Script',          rangeMap(0x1D49C, 0x1D4B6, null, {
+    'B':'\u212C','E':'\u2130','F':'\u2131','H':'\u210B','I':'\u2110',
+    'L':'\u2112','M':'\u2133','R':'\u211B',
+    'e':'\u212F','g':'\u210A','o':'\u2134'
+  })),
+  E('✦ Script Bold',     rangeMap(0x1D4D0, 0x1D4EA)),
+  E('✦ Fraktur',         rangeMap(0x1D504, 0x1D51E, null, {
+    'C':'\u212D','H':'\u210C','I':'\u2111','R':'\u211C','Z':'\u2128'
+  })),
+  E('✦ Fraktur Bold',    rangeMap(0x1D56C, 0x1D586)),
+  E('✦ Double-Struck',   rangeMap(0x1D538, 0x1D552, 0x1D7D8, {
+    'C':'\u2102','H':'\u210D','N':'\u2115','P':'\u2119','Q':'\u211A',
+    'R':'\u211D','Z':'\u2124'
+  })),
+  E('✦ Sans',            rangeMap(0x1D5A0, 0x1D5BA, 0x1D7E2)),
+  E('✦ Sans Bold',       rangeMap(0x1D5D4, 0x1D5EE, 0x1D7EC)),
+  E('✦ Sans Italic',     rangeMap(0x1D608, 0x1D622)),
+  E('✦ Sans Bold Italic', rangeMap(0x1D63C, 0x1D656)),
+  E('✦ Monospace',       rangeMap(0x1D670, 0x1D68A, 0x1D7F6)),
+  E('✦ Fullwidth',       rangeMap(0xFF21, 0xFF41, 0xFF10)),
+  E('✦ Circled',         circleMap()),
+  E('✦ Circled Black',   negCircleMap()),
+  E('✦ Squared',         squaredMap()),
+  E('✦ Squared Black',   negSquaredMap()),
+  E('✦ Parenthesized',   parenMap()),
+  E('✦ Small Caps',      smallCapsMap()),
+  E('✦ Superscript',     supMap),
+  E('✦ Subscript',       subMap),
+  { name: '✦ Upside Down', apply: upsideDown },
+  { name: '✦ Strikethrough', apply: strikeMark },
+  { name: '✦ Underline',     apply: underlineMark },
+];
+
+/* ============ ابزارهای فارسی ============ */
+const persianLetter = /[\u0621-\u064A]/;
+
+function combineMark(text, mark) {
+  let out = '';
+  for (const ch of text) out += ch + mark;
+  return out;
+}
+
+function persianTatweel(text) {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    out += text[i];
+    if (persianLetter.test(text[i]) && i < text.length - 1 && persianLetter.test(text[i+1])) {
+      out += 'ـ';
+    }
+  }
+  return out;
+}
+
+function persianTatweelFull(text) {
+  let out = '';
+  for (const ch of text) {
+    out += ch;
+    if (persianLetter.test(ch)) out += 'ـ';
+  }
+  return out;
+}
+
+function persianDigitsArabic(text) {
+  const map = {'۰':'٠','۱':'١','۲':'٢','۳':'٣','۴':'٤','۵':'٥','۶':'٦','۷':'٧','۸':'٨','۹':'٩'};
+  return applyMap(text, map);
+}
+
+function persianDigitsEnglish(text) {
+  const map = {'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'};
+  return applyMap(text, map);
+}
+
+function decorate(text, left, right) { return left + ' ' + text + ' ' + right; }
+
+/* ============ استایل‌های فارسی ============ */
+const persianStyles = [
+  { name: '✦ عادی',              apply: t => t },
+  { name: '✦ زیرخط‌دار',          apply: t => combineMark(t, '\u0332') },
+  { name: '✦ خط‌خورده',           apply: t => combineMark(t, '\u0336') },
+  { name: '✦ بالاخط‌دار',         apply: t => combineMark(t, '\u0305') },
+  { name: '✦ دو خط زیر',          apply: t => combineMark(t, '\u0333') },
+  { name: '✦ نقطه‌چین',           apply: t => combineMark(t, '\u0307') },
+  { name: '✦ کشیده',              apply: persianTatweel },
+  { name: '✦ کشیده کامل',         apply: persianTatweelFull },
+  { name: '✦ تزئین ۞',            apply: t => decorate(t, '۞', '۞') },
+  { name: '✦ تزئین ﴾﴿',           apply: t => decorate(t, '﴾', '﴿') },
+  { name: '✦ تزئین ❁',            apply: t => decorate(t, '❁', '❁') },
+  { name: '✦ تزئین ★',            apply: t => decorate(t, '★', '★') },
+  { name: '✦ تزئین ✦',            apply: t => decorate(t, '✦', '✦') },
+  { name: '✦ اعداد عربی',         apply: persianDigitsArabic },
+  { name: '✦ اعداد انگلیسی',      apply: persianDigitsEnglish },
+];
+
+/* ============ تشخیص زبان ============ */
+function detectMode(text) {
+  if (!text) return currentMode;
+  const latin = (text.match(/[a-zA-Z]/g) || []).length;
+  const persian = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  if (latin === 0 && persian === 0) return currentMode;
+  return latin > persian ? 'en' : 'fa';
+}
+
+function updateModeButtons() {
+  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === currentMode));
+}
+
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    userSelectedMode = true;
+    currentMode = btn.dataset.mode;
+    updateModeButtons();
+    render();
+  });
+});
+
+/* ============ کپی ============ */
+async function copyText(btn, text, row) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    document.body.removeChild(ta);
+  }
+  const orig = btn.textContent;
+  btn.textContent = '✓ COPIED';
+  btn.classList.add('copied');
+  row.classList.add('copied-flash');
+  setTimeout(() => {
+    btn.textContent = orig;
+    btn.classList.remove('copied');
+    row.classList.remove('copied-flash');
+  }, 1400);
+}
+
+/* ============ رندر ============ */
+function render() {
+  const text = inputEl.value;
+  const styles = currentMode === 'en' ? englishStyles : persianStyles;
+  outputsEl.innerHTML = '';
+  styles.forEach(style => {
+    const result = style.apply(text);
+    const row = document.createElement('div');
+    row.className = 'output';
+
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = style.name;
+
+    const txt = document.createElement('div');
+    txt.className = 'text ' + (currentMode === 'en' ? 'ltr' : 'rtl');
+    txt.textContent = result || '—';
+
+    const btn = document.createElement('button');
+    btn.className = 'copy';
+    btn.textContent = 'COPY';
+    btn.onclick = () => copyText(btn, result, row);
+
+    row.append(label, txt, btn);
+    outputsEl.appendChild(row);
+  });
+}
+
+/* ============ رویدادها ============ */
+let timer;
+inputEl.addEventListener('input', () => {
+  if (!userSelectedMode) {
+    const detected = detectMode(inputEl.value);
+    if (detected !== currentMode) {
+      currentMode = detected;
+      updateModeButtons();
+    }
+  }
+  clearTimeout(timer);
+  timer = setTimeout(render, 40);
+});
+
+/* شروع */
+currentMode = detectMode(inputEl.value);
+updateModeButtons();
+render();
+</script>
+</body>
+</html>
